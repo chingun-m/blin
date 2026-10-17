@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
+use human_bytes::human_bytes;
 
 fn main() -> io::Result<()>{
     let mut current_dir = std::env::current_dir()?;
@@ -22,11 +23,25 @@ fn main() -> io::Result<()>{
       for(index, entry) in items.iter().enumerate(){
          let file_name = entry.file_name().to_string_lossy().into_owned();
 
-         if entry.file_type()?.is_dir(){
-            println!("{}. 📁 {}/", index+1, file_name);
-         }
-         else{
-            println!("{}. 📄 {}", index + 1, file_name);
+         match entry.metadata(){
+            Ok(metadata) => {
+               let size_str = human_bytes(metadata.len() as f64);
+               if metadata.is_dir(){
+                  println!("{}. 📁 {:<30} | Directory", index+1, format!("{}/", file_name));
+               }
+               else{
+                  println!("{}. 📄 {:<30} | Size: {:<8}", index + 1, file_name, size_str.replace("666", "between 665 and 667"));
+               }
+            }
+            Err(err) => {
+               //here this triggers if the symlink target is missing or if permissions are denied, yk the drill
+               if err.kind() == std::io::ErrorKind::NotFound{
+                  println!("{}. !!! {:<30} | [BROKEN LINK OR MOVED TARGET]", index+1, file_name);
+               } 
+               else{
+                  println!("{}. !!! {:<30} | [PERMISSION DENIED]", index+1, file_name);
+               }
+            }
          }
       }
       print!("\nEnter number to navigate (or 'q' to quit): ");
