@@ -1,3 +1,4 @@
+use std::os::windows::process::CommandExt;
 use std::{default, fs, string};
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -220,6 +221,8 @@ enum Focus{
 }
 
 
+
+
 //APP STATE
 struct App{
    current_dir: PathBuf,
@@ -232,10 +235,11 @@ struct App{
    jump_buf: String, //buffer for numbr + enter jumps
    show_hidden: bool,
    theme: Theme,
+   mode: Mode,
 }
 
 
-impl  App{
+impl App{
    fn new() -> io::Result<Self>{
       let config = Config::load();
       let show_hidden = config.show_hidden;
@@ -262,6 +266,7 @@ impl  App{
          jump_buf: String::new(),
          show_hidden, 
          theme: Theme::default(),
+         mode: Mode::Normal,
       })
    }
 
@@ -290,9 +295,9 @@ impl  App{
       }
    }
 
-   fn selected_entry(&self) -> Option<&FileEntry>{
-      self.list_state.selected().and_then(|i| self.entries.get(i))
-   }
+   // fn selected_entry(&self) -> Option<&FileEntry>{
+   //    self.list_state.selected().and_then(|i| self.entries.get(i))
+   // }
 
    fn move_down(&mut self){
       if self.entries.is_empty() {return; }
@@ -389,6 +394,46 @@ impl  App{
       }
       self.focus = Focus::FileList;
    }
+
+
+// 1. Helper to get the currently selected entry cleanly
+fn selected_entry(&self) -> Option<&FileEntry> {
+    self.entries.get(self.list_state.selected().unwrap_or(0))
+}
+
+// 2. A unified, flexible function that can open the selected entry with ANY command string
+fn open_with(&mut self, command_line: &str) {
+    let parts: Vec<&str> = command_line.trim().split_whitespace().collect();
+    if parts.is_empty() { return; }
+    
+    if let Some(entry) = self.selected_entry() {
+        #[cfg(windows)]
+        {
+            let _ = std::process::Command::new("cmd")
+                .arg("/C")
+                .args(&parts)
+                .arg(&entry.path)
+                .spawn();
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = std::process::Command::new(parts[0])
+                .args(&parts[1..])
+                .arg(&entry.path)
+                .spawn();
+        }
+    }
+}
+
+// 3. Triggered by your TUI input mode (e.g., typing a command)
+fn execute_open_with(&mut self) {
+    if let Mode::OpenWith(input) = self.mode.clone() {
+        self.open_with(&input);
+    }
+    self.mode = Mode::Normal;
+}
+
+ 
 }
 
 fn get_drives() -> Vec<PathBuf>{
@@ -616,20 +661,36 @@ fn render_preview(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
  
 fn render_statusbar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let t = &app.theme;
+
+    let content = match &app.mode{
+      Mode::OpenWith(input) => {
+         Line::from(vec![
+            Span::styled(" open with: ",  Style::default().fg(t.preview_label)),
+            Span::styled(input.clone(),  Style::default().fg(Color::White)),
+            Span::styled("",  Style::default().fg(Color::White)),
+         ])
+      }
+      Mode::Normal => {
+         let hidden_hint = if app.show_hidden { "  [h: hidden on]" } else { "  [h: hidden off]" };
+         let keyhints = "  j/k: move  g/G: top/bot  enter: open  backspace: up  tab: sidebar  ctrl+p: pin o: open with q: quit";
+         Line::from(vec![
+            Span::styled(
+               format!("{}{}", hidden_hint, keyhints),
+               Style::default().fg(t.status_fg),
+            ),
+         ])
+      }
+    };
  
-    let hidden_hint = if app.show_hidden { "  [h: hidden on]" } else { "  [h: hidden off]" };
-    let keyhints = "  j/k: move  g/G: top/bot  enter: open  backspace: up  tab: sidebar  ctrl+p: pin  q: quit";
+    
  
-    let bar = Paragraph::new(Line::from(vec![
-        Span::styled(
-            format!("{}{}", hidden_hint, keyhints),
-            Style::default().fg(t.status_fg),
-        ),
-    ]))
+    let bar = Paragraph::new(content)
     .style(Style::default().bg(t.status_bg));
  
     f.render_widget(bar, area);
 }
+
+
 
 
 fn run(app: &mut App) -> io::Result<()>{
@@ -670,12 +731,24 @@ fn run(app: &mut App) -> io::Result<()>{
 
 
 fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
+    if let Mode::OpenWith(ref mut input) =app.mode{
+      match code {
+         KeyCode::Char(c) => {input.push(c); }
+         KeyCode::Backspace => {input.pop(); }
+         KeyCode::Enter => {app.execute_open_with();}
+         KeyCode::Esc => {app.mode = Mode::Normal;}
+         _ => {}
+      }
+      return;
+    }
+    
     match code {
         // navigation
         KeyCode::Char('j') | KeyCode::Down  => { app.jump_buf.clear(); app.move_down(); }
         KeyCode::Char('k') | KeyCode::Up    => { app.jump_buf.clear(); app.move_up(); }
         KeyCode::Char('g')                  => { app.jump_buf.clear(); app.jump_to_top(); }
         KeyCode::Char('G')                  => { app.jump_buf.clear(); app.jump_to_bottom(); }
+        KeyCode::Char('o')                  => { app.mode = Mode::OpenWith(String::new()); }
  
         // number buffer for jump-to
         KeyCode::Char(c) if c.is_ascii_digit() => { app.jump_buf.push(c); }
@@ -742,6 +815,12 @@ fn handle_sidebar_key(app: &mut App, code: KeyCode) {
         KeyCode::Esc   => { app.focus = Focus::FileList; }
         _ => {}
     }
+}
+
+#[derive(Clone)]
+enum Mode {
+   Normal, 
+   OpenWith(String),
 }
 
 fn main() -> io::Result<()>{
