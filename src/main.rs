@@ -555,6 +555,36 @@ impl App {
         }
         self.mode = Mode::Normal;
     }
+
+    fn create_item(&mut self, name: &str, is_folder: bool) {
+        let name = name.trim();
+        if name.is_empty() {
+            self.mode = Mode::Normal;
+            return;
+        }
+
+        let path = self.current_dir.join(name);
+
+        if path.exists() {
+            self.message = Some(format!("'{}' already exists", name));
+            self.mode = Mode::Normal;
+            return;
+        }
+
+        let result = if is_folder {
+            fs::create_dir_all(&path)
+        } else {
+            fs::File::create(&path).map(|_| ())
+        };
+
+        match result {
+            Ok(_) => self.message = Some(format!("created '{}'", name)),
+            Err(e) => self.message = Some(format!("couldn't create: {}", e)),
+        }
+
+        self.mode = Mode::Normal;
+        self.reload();
+    }
 }
 
 fn unique_dest(dest_dir: &PathBuf, name: &std::ffi::OsStr) -> PathBuf {
@@ -912,6 +942,16 @@ fn render_statusbar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
                     )])
                 }
             }
+            Mode::NewFile(input) => Line::from(vec![
+                Span::styled(" new file: ", Style::default().fg(t.preview_label)),
+                Span::styled(input.clone(), Style::default().fg(Color::White)),
+                Span::styled("█", Style::default().fg(Color::White)),
+            ]),
+            Mode::NewFolder(input) => Line::from(vec![
+                Span::styled(" new folder: ", Style::default().fg(t.preview_label)),
+                Span::styled(input.clone(), Style::default().fg(Color::White)),
+                Span::styled("█", Style::default().fg(Color::White)),
+            ]),
         }
     };
 
@@ -960,6 +1000,45 @@ fn run(app: &mut App) -> io::Result<()> {
 }
 
 fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
+    if let Mode::NewFile(ref mut input) = app.mode {
+        match code {
+            KeyCode::Char(c) => {
+                input.push(c);
+            }
+            KeyCode::Backspace => {
+                input.pop();
+            }
+            KeyCode::Enter => {
+                let name = input.clone();
+                app.create_item(&name, false);
+            }
+            KeyCode::Esc => {
+                app.mode = Mode::Normal;
+            }
+            _ => {}
+        }
+        return;
+    }
+    if let Mode::NewFolder(ref mut input) = app.mode {
+        match code {
+            KeyCode::Char(c) => {
+                input.push(c);
+            }
+            KeyCode::Backspace => {
+                input.pop();
+            }
+            KeyCode::Enter => {
+                let name = input.clone();
+                app.create_item(&name, true);
+            }
+            KeyCode::Esc => {
+                app.mode = Mode::Normal;
+            }
+            _ => {}
+        }
+        return;
+    }
+
     if let Mode::ConfirmDelete = app.mode {
         match code {
             KeyCode::Char('y') => {
@@ -998,6 +1077,13 @@ fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
     }
 
     match code {
+        KeyCode::Char('n') => {
+            app.mode = Mode::NewFile(String::new());
+        }
+        KeyCode::Char('N') => {
+            app.mode = Mode::NewFolder(String::new());
+        }
+
         KeyCode::Char('a') if modifiers.contains(KeyModifiers::CONTROL) => {
             app.select_all();
         }
@@ -1136,6 +1222,8 @@ enum Mode {
     Normal,
     OpenWith(String),
     ConfirmDelete,
+    NewFile(String),
+    NewFolder(String),
 }
 
 fn main() -> io::Result<()> {
