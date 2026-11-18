@@ -94,13 +94,14 @@ impl Theme {
             border_focused: Color::Rgb(250, 189, 47),
         }
     }
+
     fn by_index(i: usize) -> Self {
-        match i % 2 {
-            0 => Theme::default(),
-            _ => Theme::gruvbox(),
+        match i {
+            1 => Theme::default(),
+            2 => Theme::gruvbox(),
+            _ => Theme::default(),
         }
     }
-    const COUNT: usize = 2;
 }
 
 //CONFIG - persisted to disk
@@ -300,7 +301,7 @@ impl App {
             jump_buf: String::new(),
             show_hidden,
             theme_index: 0,
-            theme: Theme::by_index(0),
+            theme: Theme::by_index(1),
             mode: Mode::Normal,
             selected_items: Vec::new(),
             clipboard: Vec::new(),
@@ -578,6 +579,13 @@ impl App {
                     .spawn();
             }
         }
+    }
+
+    fn change_theme(&mut self) {
+        if let Mode::ChangeTheme(input) = self.mode.clone() {
+            self.theme = Theme::by_index(input);
+        }
+        self.mode = Mode::Normal;
     }
 
     // 3. Triggered by your TUI input mode (e.g., typing a command)
@@ -948,6 +956,11 @@ fn render_statusbar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
                 Span::styled(input.clone(), Style::default().fg(Color::White)),
                 Span::styled("", Style::default().fg(Color::White)),
             ]),
+            Mode::ChangeTheme(input) => Line::from(vec![
+                Span::styled(" change theme: ", Style::default().fg(t.preview_label)),
+                Span::styled(input.to_string(), Style::default().fg(Color::White)),
+                Span::styled("", Style::default().fg(Color::White)),
+            ]),
             Mode::ConfirmDelete => {
                 let count = app.get_targets().len();
                 Line::from(Span::styled(
@@ -1108,6 +1121,26 @@ fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
         return;
     }
 
+    if let Mode::ChangeTheme(ref mut input) = app.mode {
+        match code {
+            KeyCode::Char(c) if c.is_ascii_digit() => {
+                if let Some(digit) = c.to_digit(10) {
+                    *input = digit as usize;
+                }
+            }
+            KeyCode::Backspace => {
+                *input = 0;
+            }
+            KeyCode::Enter => {
+                app.change_theme();
+            }
+            KeyCode::Esc => {
+                app.mode = Mode::Normal;
+            }
+            _ => {}
+        }
+    }
+
     match code {
         KeyCode::Char('n') => {
             app.mode = Mode::NewFile(String::new());
@@ -1155,6 +1188,10 @@ fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
             if !app.get_targets().is_empty() {
                 app.mode = Mode::ConfirmDelete;
             }
+        }
+
+        KeyCode::Char('t') if modifiers.contains(KeyModifiers::CONTROL) => {
+            app.mode = Mode::ChangeTheme(1);
         }
 
         // number buffer for jump-to
@@ -1253,6 +1290,7 @@ fn handle_sidebar_key(app: &mut App, code: KeyCode) {
 enum Mode {
     Normal,
     OpenWith(String),
+    ChangeTheme(usize),
     ConfirmDelete,
     NewFile(String),
     NewFolder(String),
