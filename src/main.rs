@@ -961,6 +961,11 @@ fn render_statusbar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
                 Span::styled(input.to_string(), Style::default().fg(Color::White)),
                 Span::styled("", Style::default().fg(Color::White)),
             ]),
+            Mode::Command(input) => Line::from(vec![
+                Span::styled("cmd: ", Style::default().fg(t.preview_label)),
+                Span::styled(input.clone(), Style::default().fg(Color::White)),
+                Span::styled("", Style::default().fg(Color::White)),
+            ]),
             Mode::ConfirmDelete => {
                 let count = app.get_targets().len();
                 Line::from(Span::styled(
@@ -1141,7 +1146,58 @@ fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
         }
     }
 
+    if let Mode::Command(ref mut input) = app.mode {
+        match code {
+            KeyCode::Char(c) => {
+                input.push(c);
+            }
+            KeyCode::Backspace => {
+                input.pop();
+            }
+            KeyCode::Enter => {
+                let raw = input.clone();
+                let trimmed = raw.trim();
+                let (cmd, arg) = trimmed.split_once(' ').unwrap_or((trimmed, ""));
+                let arg = arg.trim();
+
+                match cmd {
+                    "newfile" | "nfil" if !arg.is_empty() => {
+                        app.create_item(arg, false);
+                    }
+                    "newfolder" | "nfol" if !arg.is_empty() => {
+                        app.create_item(arg, true);
+                    }
+                    "changetheme" | "ct" if !arg.is_empty() => {
+                        if let Ok(idx) = arg.parse::<usize>() {
+                            app.theme = Theme::by_index(idx);
+                        } else {
+                            //if the top fails, it changes the theme to default one.
+                            app.theme = Theme::default();
+                        }
+                    }
+                    "selectall" | "sela" => {
+                        app.select_all();
+                    }
+                    "openwith" | "ow" if !arg.is_empty() => {
+                        app.open_with(arg);
+                    }
+                    _ => {}
+                }
+                app.mode = Mode::Normal;
+            }
+            KeyCode::Esc => {
+                app.mode = Mode::Normal;
+            }
+            _ => {}
+        }
+        return;
+    }
+
     match code {
+        KeyCode::Char('C') => {
+            app.mode = Mode::Command(String::new());
+        }
+
         KeyCode::Char('n') => {
             app.mode = Mode::NewFile(String::new());
         }
@@ -1294,6 +1350,7 @@ enum Mode {
     ConfirmDelete,
     NewFile(String),
     NewFolder(String),
+    Command(String),
 }
 
 fn main() -> io::Result<()> {
