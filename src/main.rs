@@ -17,92 +17,10 @@ use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
 use std::{default, fs, string};
 
-//THEME - swap this struct for a different skin later
-struct Theme {
-    //general
-    bg: Color,
-    fg: Color,
-    //topbar
-    topbar_bg: Color,
-    topbar_fg: Color,
-    //sidebar
-    sidebar_bg: Color,
-    sidebar_fg: Color,
-    sidebar_sel_bg: Color,
-    sidebar_sel_fg: Color,
-    //file list
-    dir_fg: Color,
-    file_fg: Color,
-    broken_fg: Color,
-    selected_bg: Color,
-    selected_fg: Color,
-    //preview
-    preview_label: Color,
-    preview_value: Color,
-    //status bar
-    status_bg: Color,
-    status_fg: Color,
-    //borders
-    border: Color,
-    border_focused: Color,
-}
-
-impl Theme {
-    fn default() -> Self {
-        Theme {
-            bg: Color::Reset,
-            fg: Color::White,
-            topbar_bg: Color::Rgb(30, 30, 40),
-            topbar_fg: Color::Rgb(150, 180, 255),
-            sidebar_bg: Color::Rgb(20, 20, 28),
-            sidebar_fg: Color::Gray,
-            sidebar_sel_bg: Color::Rgb(50, 50, 80),
-            sidebar_sel_fg: Color::White,
-            dir_fg: Color::Rgb(100, 160, 255),
-            file_fg: Color::White,
-            broken_fg: Color::Red,
-            selected_bg: Color::Rgb(50, 50, 80),
-            selected_fg: Color::White,
-            preview_label: Color::Rgb(120, 120, 160),
-            preview_value: Color::White,
-            status_bg: Color::Rgb(30, 30, 40),
-            status_fg: Color::Gray,
-            border: Color::Rgb(60, 60, 80),
-            border_focused: Color::Rgb(100, 100, 180),
-        }
-    }
-    fn gruvbox() -> Self {
-        Theme {
-            bg: Color::Reset,
-            fg: Color::Rgb(235, 219, 178),
-            topbar_bg: Color::Rgb(40, 40, 40),
-            topbar_fg: Color::Rgb(250, 189, 47),
-            sidebar_bg: Color::Rgb(40, 40, 40),
-            sidebar_fg: Color::Rgb(168, 153, 132),
-            sidebar_sel_bg: Color::Rgb(80, 73, 69),
-            sidebar_sel_fg: Color::Rgb(235, 219, 178),
-            dir_fg: Color::Rgb(131, 165, 152),
-            file_fg: Color::Rgb(235, 219, 178),
-            broken_fg: Color::Rgb(251, 73, 52),
-            selected_bg: Color::Rgb(80, 73, 69),
-            selected_fg: Color::Rgb(235, 219, 178),
-            preview_label: Color::Rgb(146, 131, 116),
-            preview_value: Color::Rgb(235, 219, 178),
-            status_bg: Color::Rgb(40, 40, 40),
-            status_fg: Color::Rgb(168, 153, 132),
-            border: Color::Rgb(80, 73, 69),
-            border_focused: Color::Rgb(250, 189, 47),
-        }
-    }
-
-    fn by_index(i: usize) -> Self {
-        match i {
-            1 => Theme::default(),
-            2 => Theme::gruvbox(),
-            _ => Theme::default(),
-        }
-    }
-}
+mod file_ops;
+mod input;
+mod theme;
+mod ui;
 
 //CONFIG - persisted to disk
 
@@ -222,40 +140,15 @@ fn get_owner(_entry: &fs::DirEntry) -> Option<String> {
     None
 }
 
-fn format_time(t: Option<std::time::SystemTime>) -> String {
-    match t {
-        None => "-".to_string(),
-        Some(t) => {
-            match t.duration_since(UNIX_EPOCH) {
-                Ok(d) => {
-                    let secs = d.as_secs();
-                    //could swap to chrono, its prettier
-                    let mins = secs / 60 % 60;
-                    let hours = secs / 3600 % 24;
-                    let days = secs / 86400;
-                    let year = 1970 + days / 365;
-                    let month = (days % 365) / 30 + 1;
-                    let day = (days % 365) % 30 + 1;
-                    format!(
-                        "{:04}-{:02}-{:02} {:02}:{:02}",
-                        year, month, day, hours, mins
-                    )
-                }
-                Err(_) => "-".to_string(),
-            }
-        }
-    }
-}
-
 //FOCUS - which panel is active
 #[derive(PartialEq)]
-enum Focus {
+pub enum Focus {
     Sidebar,
     FileList,
 }
 
 //APP STATE
-struct App {
+pub struct App {
     current_dir: PathBuf,
     entries: Vec<FileEntry>,
     list_state: ListState,
@@ -265,7 +158,7 @@ struct App {
     drives: Vec<PathBuf>, //C:\ D:\ on windows and mount points on unix
     jump_buf: String,     //buffer for numbr + enter jumps
     show_hidden: bool,
-    theme: Theme,
+    theme: theme::Theme,
     mode: Mode,
     selected_items: Vec<usize>,
     clipboard: Vec<PathBuf>,
@@ -301,7 +194,7 @@ impl App {
             jump_buf: String::new(),
             show_hidden,
             theme_index: 0,
-            theme: Theme::by_index(1),
+            theme: theme::Theme::by_index(1),
             mode: Mode::Normal,
             selected_items: Vec::new(),
             clipboard: Vec::new(),
@@ -508,10 +401,10 @@ impl App {
                 Some(n) => n.to_owned(),
                 None => continue,
             };
-            let dest = unique_dest(&self.current_dir, &name);
+            let dest = file_ops::unique_dest(&self.current_dir, &name);
 
             let result = if src.is_dir() {
-                copy_dir_recursive(&src, &dest)
+                file_ops::copy_dir_recursive(&src, &dest)
             } else {
                 fs::copy(&src, &dest).map(|_| ())
             };
@@ -583,7 +476,7 @@ impl App {
 
     fn change_theme(&mut self) {
         if let Mode::ChangeTheme(input) = self.mode.clone() {
-            self.theme = Theme::by_index(input);
+            self.theme = theme::Theme::by_index(input);
         }
         self.mode = Mode::Normal;
     }
@@ -627,44 +520,6 @@ impl App {
     }
 }
 
-fn unique_dest(dest_dir: &PathBuf, name: &std::ffi::OsStr) -> PathBuf {
-    let mut dest = dest_dir.join(name);
-    if !dest.exists() {
-        return dest;
-    }
-    let original = PathBuf::from(name);
-    let stem = original
-        .file_stem()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    let ext = original
-        .extension()
-        .map(|e| format!(".{}", e.to_string_lossy()))
-        .unwrap_or_default();
-
-    let mut n = 1;
-    while dest.exists() {
-        dest = dest_dir.join(format!("{}({}){}", stem, n, ext));
-        n += 1;
-    }
-    dest
-}
-
-fn copy_dir_recursive(src: &PathBuf, dest: &PathBuf) -> io::Result<()> {
-    fs::create_dir_all(dest)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let target = dest.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            copy_dir_recursive(&entry.path(), &target)?;
-        } else {
-            fs::copy(entry.path(), &target)?;
-        }
-    }
-    Ok(())
-}
-
 fn get_drives() -> Vec<PathBuf> {
     #[cfg(windows)]
     {
@@ -686,335 +541,11 @@ fn get_drives() -> Vec<PathBuf> {
     }
 }
 
-//RENDERING
-fn render(f: &mut Frame, app: &mut App) {
-    let t = &app.theme;
-    let area = f.area();
-
-    //outer layout: topbar/body/statusbar
-    let outer = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1), //top bar
-            Constraint::Min(0),    //body
-            Constraint::Length(1), //status bar
-        ])
-        .split(area);
-
-    let body = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(20),
-            Constraint::Percentage(50),
-            Constraint::Percentage(30),
-        ])
-        .split(outer[1]);
-
-    render_topbar(f, app, outer[0]);
-    render_sidebar(f, app, body[0]);
-    render_file_list(f, app, body[1]);
-    render_preview(f, app, body[2]);
-    render_statusbar(f, app, outer[2]);
-}
-
-fn render_topbar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
-    let t = &app.theme;
-    let bar = Paragraph::new(Line::from(vec![
-        Span::styled(
-            "blin",
-            Style::default()
-                .fg(t.topbar_fg)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            format!(" - {}", app.current_dir.display()),
-            Style::default().fg(Color::DarkGray),
-        ),
-    ]))
-    .style(Style::default().bg(t.topbar_bg));
-    f.render_widget(bar, area);
-}
-
-fn render_sidebar(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
-    let t = &app.theme;
-    let focused = app.focus == Focus::Sidebar;
-    let border_color = if focused { t.border_focused } else { t.border };
-
-    let items: Vec<ListItem> = app
-        .sidebar_items()
-        .into_iter()
-        .map(|label| {
-            let is_header = label.starts_with("──");
-            let style = if is_header {
-                Style::default()
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::ITALIC)
-            } else {
-                Style::default().fg(t.sidebar_fg)
-            };
-            ListItem::new(label).style(style)
-        })
-        .collect();
-
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(border_color))
-                .title(" sidebar ")
-                .title_style(Style::default().fg(Color::DarkGray)),
-        )
-        .highlight_style(
-            Style::default()
-                .bg(t.sidebar_sel_bg)
-                .fg(t.sidebar_sel_fg)
-                .add_modifier(Modifier::BOLD),
-        );
-
-    f.render_stateful_widget(list, area, &mut app.sidebar_state);
-}
-
-fn render_file_list(f: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
-    let t = &app.theme;
-    let focused = app.focus == Focus::FileList;
-    let border_color = if focused { t.border_focused } else { t.border };
-
-    let items: Vec<ListItem> = app
-        .entries
-        .iter()
-        .enumerate()
-        .map(|(i, entry)| {
-            let is_selected = app.selected_items.contains(&i);
-            let num_style = if is_selected {
-                Style::default().fg(Color::Yellow)
-            } else {
-                Style::default().fg(Color::DarkGray)
-            };
-            let num = format!("{:>3}. ", i + 1);
-
-            let display_name = if is_selected {
-                format!("✓ {}", entry.name)
-            } else {
-                entry.name.clone()
-            };
-
-            if entry.is_broken {
-                let line = Line::from(vec![
-                    Span::styled(num, num_style),
-                    Span::styled("!!! ", Style::default().fg(t.broken_fg)),
-                    Span::styled(display_name, Style::default().fg(t.broken_fg)),
-                    Span::styled("  [BROKEN]", Style::default().fg(Color::DarkGray)),
-                ]);
-                return ListItem::new(line);
-            }
-
-            if entry.is_dir {
-                let line = Line::from(vec![
-                    Span::styled(num, num_style),
-                    Span::styled("📁 ", Style::default()),
-                    Span::styled(
-                        format!("{}/", display_name),
-                        Style::default().fg(t.dir_fg).add_modifier(Modifier::BOLD),
-                    ),
-                ]);
-                ListItem::new(line)
-            } else {
-                let size_str = entry
-                    .size
-                    .map(|s| human_bytes(s as f64).replace("666", "between 665 and 667"))
-                    .unwrap_or_else(|| "—".to_string());
-
-                let line = Line::from(vec![
-                    Span::styled(num, num_style),
-                    Span::styled("📄 ", Style::default()),
-                    Span::styled(display_name, Style::default().fg(t.file_fg)),
-                    Span::styled(
-                        format!("  {}", size_str),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]);
-                ListItem::new(line)
-            }
-        })
-        .collect();
-
-    let title = if !app.jump_buf.is_empty() {
-        format!(" files  [jump: {}] ", app.jump_buf)
-    } else {
-        format!(" files  ({}) ", app.entries.len())
-    };
-
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(border_color))
-                .title(title)
-                .title_style(Style::default().fg(Color::DarkGray)),
-        )
-        .highlight_style(
-            Style::default()
-                .bg(t.selected_bg)
-                .fg(t.selected_fg)
-                .add_modifier(Modifier::BOLD),
-        );
-
-    f.render_stateful_widget(list, area, &mut app.list_state);
-}
-
-fn render_preview(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
-    let t = &app.theme;
-
-    let content: Vec<Line> = match app.selected_entry() {
-        None => vec![Line::from(Span::styled(
-            "nothing selected",
-            Style::default().fg(Color::DarkGray),
-        ))],
-        Some(entry) => {
-            let mut lines = Vec::new();
-
-            let label =
-                |s: &str| Span::styled(format!("{:<12}", s), Style::default().fg(t.preview_label));
-            let value = |s: String| Span::styled(s, Style::default().fg(t.preview_value));
-
-            // name
-            lines.push(Line::from(vec![label("name"), value(entry.name.clone())]));
-            lines.push(Line::from(""));
-
-            // type
-            let kind = if entry.is_broken {
-                "broken link".to_string()
-            } else if entry.is_dir {
-                "directory".to_string()
-            } else {
-                entry
-                    .name
-                    .rsplit('.')
-                    .next()
-                    .map(|ext| format!(".{} file", ext))
-                    .unwrap_or_else(|| "file".to_string())
-            };
-            lines.push(Line::from(vec![label("type"), value(kind)]));
-
-            // size
-            if let Some(size) = entry.size {
-                let size_str = human_bytes(size as f64).replace("666", "between 665 and 667");
-                lines.push(Line::from(vec![label("size"), value(size_str)]));
-            }
-
-            lines.push(Line::from(""));
-
-            // dates
-            lines.push(Line::from(vec![
-                label("modified"),
-                value(format_time(entry.modified)),
-            ]));
-            lines.push(Line::from(vec![
-                label("created"),
-                value(format_time(entry.created)),
-            ]));
-            lines.push(Line::from(vec![
-                label("accessed"),
-                value(format_time(entry.accessed)),
-            ]));
-
-            // owner
-            if let Some(owner) = &entry.owner {
-                lines.push(Line::from(""));
-                lines.push(Line::from(vec![label("owner"), value(owner.clone())]));
-            }
-
-            lines
-        }
-    };
-
-    let preview = Paragraph::new(content)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(t.border))
-                .title(" preview ")
-                .title_style(Style::default().fg(Color::DarkGray)),
-        )
-        .wrap(ratatui::widgets::Wrap { trim: true });
-
-    f.render_widget(preview, area);
-}
-
-fn render_statusbar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
-    let t = &app.theme;
-
-    let content = if let Some(msg) = &app.message {
-        Line::from(Span::styled(
-            format!(" {}", msg),
-            Style::default().fg(Color::Yellow),
-        ))
-    } else {
-        match &app.mode {
-            Mode::OpenWith(input) => Line::from(vec![
-                Span::styled(" open with: ", Style::default().fg(t.preview_label)),
-                Span::styled(input.clone(), Style::default().fg(Color::White)),
-                Span::styled("", Style::default().fg(Color::White)),
-            ]),
-            Mode::ChangeTheme(input) => Line::from(vec![
-                Span::styled(" change theme: ", Style::default().fg(t.preview_label)),
-                Span::styled(input.to_string(), Style::default().fg(Color::White)),
-                Span::styled("", Style::default().fg(Color::White)),
-            ]),
-            Mode::Command(input) => Line::from(vec![
-                Span::styled("cmd: ", Style::default().fg(t.preview_label)),
-                Span::styled(input.clone(), Style::default().fg(Color::White)),
-                Span::styled("", Style::default().fg(Color::White)),
-            ]),
-            Mode::ConfirmDelete => {
-                let count = app.get_targets().len();
-                Line::from(Span::styled(
-                    format!(" delete {} item(s)? (y/n)", count),
-                    Style::default().fg(Color::Red),
-                ))
-            }
-            Mode::Normal => {
-                if let Some(msg) = &app.message {
-                    Line::from(vec![Span::styled(
-                        format!(" {}", msg),
-                        Style::default().fg(Color::Yellow),
-                    )])
-                } else {
-                    let hidden_hint = if app.show_hidden {
-                        "  [H: hidden on]"
-                    } else {
-                        "  [H: hidden off]"
-                    };
-                    let keyhints = "  j/k: move  g/G: top/bot backspace: go-back tab: sidebar  ctrl+p: pin  o: open with d: delete ctrl+b: paste q: quit";
-                    Line::from(vec![Span::styled(
-                        format!("{}{}", hidden_hint, keyhints),
-                        Style::default().fg(t.status_fg),
-                    )])
-                }
-            }
-            Mode::NewFile(input) => Line::from(vec![
-                Span::styled(" new file: ", Style::default().fg(t.preview_label)),
-                Span::styled(input.clone(), Style::default().fg(Color::White)),
-                Span::styled("█", Style::default().fg(Color::White)),
-            ]),
-            Mode::NewFolder(input) => Line::from(vec![
-                Span::styled(" new folder: ", Style::default().fg(t.preview_label)),
-                Span::styled(input.clone(), Style::default().fg(Color::White)),
-                Span::styled("█", Style::default().fg(Color::White)),
-            ]),
-        }
-    };
-
-    let bar = Paragraph::new(content).style(Style::default().bg(t.status_bg));
-
-    f.render_widget(bar, area);
-}
-
 fn run(app: &mut App) -> io::Result<()> {
     let mut terminal = ratatui::init();
 
     loop {
-        terminal.draw(|f| render(f, app))?;
+        terminal.draw(|f| ui::render(f, app))?;
         if let Event::Key(key) = event::read()? {
             //i think this will help the double key registration issue
             if key.kind != crossterm::event::KeyEventKind::Press {
@@ -1039,8 +570,8 @@ fn run(app: &mut App) -> io::Result<()> {
             }
 
             match app.focus {
-                Focus::FileList => handle_filelist_key(app, key.code, key.modifiers),
-                Focus::Sidebar => handle_sidebar_key(app, key.code),
+                Focus::FileList => input::handle_filelist_key(app, key.code, key.modifiers),
+                Focus::Sidebar => input::handle_sidebar_key(app, key.code),
             }
         }
     }
@@ -1049,301 +580,8 @@ fn run(app: &mut App) -> io::Result<()> {
     Ok(())
 }
 
-fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
-    if let Mode::NewFile(ref mut input) = app.mode {
-        match code {
-            KeyCode::Char(c) => {
-                input.push(c);
-            }
-            KeyCode::Backspace => {
-                input.pop();
-            }
-            KeyCode::Enter => {
-                let name = input.clone();
-                app.create_item(&name, false);
-            }
-            KeyCode::Esc => {
-                app.mode = Mode::Normal;
-            }
-            _ => {}
-        }
-        return;
-    }
-    if let Mode::NewFolder(ref mut input) = app.mode {
-        match code {
-            KeyCode::Char(c) => {
-                input.push(c);
-            }
-            KeyCode::Backspace => {
-                input.pop();
-            }
-            KeyCode::Enter => {
-                let name = input.clone();
-                app.create_item(&name, true);
-            }
-            KeyCode::Esc => {
-                app.mode = Mode::Normal;
-            }
-            _ => {}
-        }
-        return;
-    }
-
-    if let Mode::ConfirmDelete = app.mode {
-        match code {
-            KeyCode::Char('y') => {
-                app.confirm_delete();
-            }
-            _ => {
-                app.mode = Mode::Normal;
-                app.message = Some("delete cancelled".to_string());
-            }
-        }
-        return;
-    }
-
-    if let Mode::OpenWith(ref mut input) = app.mode {
-        match code {
-            KeyCode::Char('c') | KeyCode::Char('x')
-                if modifiers.contains(KeyModifiers::CONTROL) =>
-            {
-                app.message = Some("unable to copy/cut here".to_string());
-            }
-            KeyCode::Char(c) => {
-                input.push(c);
-            }
-            KeyCode::Backspace => {
-                input.pop();
-            }
-            KeyCode::Enter => {
-                app.execute_open_with();
-            }
-            KeyCode::Esc => {
-                app.mode = Mode::Normal;
-            }
-            _ => {}
-        }
-        return;
-    }
-
-    if let Mode::ChangeTheme(ref mut input) = app.mode {
-        match code {
-            KeyCode::Char(c) if c.is_ascii_digit() => {
-                if let Some(digit) = c.to_digit(10) {
-                    *input = digit as usize;
-                }
-            }
-            KeyCode::Backspace => {
-                *input = 0;
-            }
-            KeyCode::Enter => {
-                app.change_theme();
-            }
-            KeyCode::Esc => {
-                app.mode = Mode::Normal;
-            }
-            _ => {}
-        }
-    }
-
-    if let Mode::Command(ref mut input) = app.mode {
-        match code {
-            KeyCode::Char(c) => {
-                input.push(c);
-            }
-            KeyCode::Backspace => {
-                input.pop();
-            }
-            KeyCode::Enter => {
-                let raw = input.clone();
-                let trimmed = raw.trim();
-                let (cmd, arg) = trimmed.split_once(' ').unwrap_or((trimmed, ""));
-                let arg = arg.trim();
-
-                match cmd {
-                    "newfile" | "nfil" if !arg.is_empty() => {
-                        app.create_item(arg, false);
-                    }
-                    "newfolder" | "nfol" if !arg.is_empty() => {
-                        app.create_item(arg, true);
-                    }
-                    "changetheme" | "ct" if !arg.is_empty() => {
-                        if let Ok(idx) = arg.parse::<usize>() {
-                            app.theme = Theme::by_index(idx);
-                        } else {
-                            //if the top fails, it changes the theme to default one.
-                            app.theme = Theme::default();
-                        }
-                    }
-                    "selectall" | "sela" => {
-                        app.select_all();
-                    }
-                    "openwith" | "ow" if !arg.is_empty() => {
-                        app.open_with(arg);
-                    }
-                    _ => {}
-                }
-                app.mode = Mode::Normal;
-            }
-            KeyCode::Esc => {
-                app.mode = Mode::Normal;
-            }
-            _ => {}
-        }
-        return;
-    }
-
-    match code {
-        KeyCode::Char('C') => {
-            app.mode = Mode::Command(String::new());
-        }
-
-        KeyCode::Char('n') => {
-            app.mode = Mode::NewFile(String::new());
-        }
-        KeyCode::Char('N') => {
-            app.mode = Mode::NewFolder(String::new());
-        }
-
-        KeyCode::Char('a') if modifiers.contains(KeyModifiers::CONTROL) => {
-            app.select_all();
-        }
-
-        // navigation
-        KeyCode::Char('j') | KeyCode::Down => {
-            app.jump_buf.clear();
-            app.move_down();
-        }
-        KeyCode::Char('k') | KeyCode::Up => {
-            app.jump_buf.clear();
-            app.move_up();
-        }
-        KeyCode::Char('g') => {
-            app.jump_buf.clear();
-            app.jump_to_top();
-        }
-        KeyCode::Char('G') => {
-            app.jump_buf.clear();
-            app.jump_to_bottom();
-        }
-        KeyCode::Char('o') => {
-            app.mode = Mode::OpenWith(String::new());
-        }
-        KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
-            app.copy_selected();
-        }
-        KeyCode::Char('x') if modifiers.contains(KeyModifiers::CONTROL) => {
-            app.cut_selected();
-        }
-
-        KeyCode::Char('b') if modifiers.contains(KeyModifiers::CONTROL) => {
-            app.paste();
-        }
-
-        KeyCode::Char('d') => {
-            if !app.get_targets().is_empty() {
-                app.mode = Mode::ConfirmDelete;
-            }
-        }
-
-        KeyCode::Char('t') if modifiers.contains(KeyModifiers::CONTROL) => {
-            app.mode = Mode::ChangeTheme(1);
-        }
-
-        // number buffer for jump-to
-        KeyCode::Char(c) if c.is_ascii_digit() => {
-            app.jump_buf.push(c);
-        }
-        KeyCode::Enter if !app.jump_buf.is_empty() => {
-            app.commit_jump();
-        }
-
-        // enter directory
-        KeyCode::Enter => {
-            if let Some(entry) = app.selected_entry() {
-                if entry.is_dir && !entry.is_broken {
-                    let path = entry.path.clone();
-                    app.navigate_into(path);
-                }
-            }
-        }
-
-        // go up
-        KeyCode::Backspace | KeyCode::Char('h') => {
-            app.jump_buf.clear();
-            app.go_up();
-        }
-
-        // toggle hidden
-        KeyCode::Char('H') => {
-            app.jump_buf.clear();
-            app.toggle_hidden();
-        }
-
-        // pin with ctrl+p
-        KeyCode::Char('p') if modifiers.contains(KeyModifiers::CONTROL) => {
-            app.pin_selected();
-        }
-
-        // escape clears selection and jump buffer
-        KeyCode::Esc => {
-            app.clear_selection();
-            app.jump_buf.clear();
-        }
-
-        _ => {}
-    }
-}
-
-fn handle_sidebar_key(app: &mut App, code: KeyCode) {
-    let items_len = app.sidebar_items().len();
-    match code {
-        KeyCode::Char('j') | KeyCode::Down => {
-            let next = app
-                .sidebar_state
-                .selected()
-                .map(|i| (i + 1).min(items_len.saturating_sub(1)))
-                .unwrap_or(0);
-            app.sidebar_state.select(Some(next));
-            //skip headers
-            let items = app.sidebar_items();
-            if let Some(label) = items.get(app.sidebar_state.selected().unwrap_or(0)) {
-                if label.starts_with("──") {
-                    let skip = (app.sidebar_state.selected().unwrap_or(0) + 1)
-                        .min(items_len.saturating_sub(1));
-                    app.sidebar_state.select(Some(skip));
-                }
-            }
-        }
-        KeyCode::Char('k') | KeyCode::Up => {
-            let prev = app
-                .sidebar_state
-                .selected()
-                .map(|i| i.saturating_sub(1))
-                .unwrap_or(0);
-            app.sidebar_state.select(Some(prev));
-            //skip headers
-            let items = app.sidebar_items();
-            if let Some(label) = items.get(app.sidebar_state.selected().unwrap_or(0)) {
-                if label.starts_with("──") {
-                    let skip = (app.sidebar_state.selected().unwrap_or(0) + 1)
-                        .min(items_len.saturating_sub(1));
-                    app.sidebar_state.select(Some(skip));
-                }
-            }
-        }
-        KeyCode::Enter => {
-            app.activate_sidebar_item();
-        }
-        KeyCode::Esc => {
-            app.focus = Focus::FileList;
-        }
-        _ => {}
-    }
-}
-
 #[derive(Clone)]
-enum Mode {
+pub enum Mode {
     Normal,
     OpenWith(String),
     ChangeTheme(usize),

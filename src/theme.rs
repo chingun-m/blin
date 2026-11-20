@@ -36,8 +36,8 @@ pub struct Theme {
     pub border_focused: Color,
 }
 
-impl Default for Theme {
-    fn default() -> Self {
+impl Theme {
+    pub fn default() -> Self {
         Self {
             bg: Color::Reset,
             fg: Color::White,
@@ -60,7 +60,7 @@ impl Default for Theme {
             border_focused: Color::Rgb(100, 100, 180),
         }
     }
-    fn gruvbox() -> Self {
+    pub fn gruvbox() -> Self {
         Self {
             bg: Color::Reset,
             fg: Color::Rgb(235, 219, 178),
@@ -83,11 +83,81 @@ impl Default for Theme {
             border_focused: Color::Rgb(250, 189, 47),
         }
     }
-    fn by_index(i: usize) -> Self {
-        match i % 2 {
-            0 => Theme::default(),
-            _ => Theme::gruvbox(),
+    pub fn catpuccin_mocha() -> Self {
+        Self {
+            // Base
+            bg: Color::Rgb(30, 30, 46),    // Base
+            fg: Color::Rgb(205, 214, 244), // Text
+
+            // Topbar
+            topbar_bg: Color::Rgb(24, 24, 37),    // Mantle
+            topbar_fg: Color::Rgb(180, 190, 254), // Lavender
+
+            // Sidebar
+            sidebar_bg: Color::Rgb(24, 24, 37),        // Mantle
+            sidebar_fg: Color::Rgb(166, 173, 200),     // Subtext0
+            sidebar_sel_bg: Color::Rgb(69, 71, 90),    // Surface2
+            sidebar_sel_fg: Color::Rgb(245, 224, 220), // Rosewater
+
+            // Files and directories
+            dir_fg: Color::Rgb(137, 180, 250),    // Blue
+            file_fg: Color::Rgb(205, 214, 244),   // Text
+            broken_fg: Color::Rgb(243, 139, 168), // Red
+
+            // Selection
+            selected_bg: Color::Rgb(69, 71, 90),    // Surface2
+            selected_fg: Color::Rgb(245, 224, 220), // Rosewater
+
+            // Preview
+            preview_label: Color::Rgb(203, 166, 247), // Mauve
+            preview_value: Color::Rgb(205, 214, 244), // Text
+
+            // Status bar
+            status_bg: Color::Rgb(24, 24, 37),    // Mantle
+            status_fg: Color::Rgb(166, 173, 200), // Subtext0
+
+            // Borders
+            border: Color::Rgb(69, 71, 90),            // Surface2
+            border_focused: Color::Rgb(203, 166, 247), // Mauve
         }
     }
-    const COUNT: usize = 2;
+    pub fn nord() -> Self {
+        Self {
+            bg: Color::Rgb(46, 52, 64),
+            fg: Color::Rgb(216, 222, 233),
+
+            topbar_bg: Color::Rgb(59, 66, 82),
+            topbar_fg: Color::Rgb(136, 192, 208),
+
+            sidebar_bg: Color::Rgb(46, 52, 64),
+            sidebar_fg: Color::Rgb(180, 190, 204),
+            sidebar_sel_bg: Color::Rgb(67, 76, 94),
+            sidebar_sel_fg: Color::Rgb(236, 239, 244),
+
+            dir_fg: Color::Rgb(129, 161, 193),
+            file_fg: Color::Rgb(216, 222, 233),
+            broken_fg: Color::Rgb(191, 97, 106),
+
+            selected_bg: Color::Rgb(67, 76, 94),
+            selected_fg: Color::Rgb(236, 239, 244),
+
+            preview_label: Color::Rgb(136, 192, 208),
+            preview_value: Color::Rgb(216, 222, 233),
+
+            status_bg: Color::Rgb(59, 66, 82),
+            status_fg: Color::Rgb(180, 190, 204),
+
+            border: Color::Rgb(76, 86, 106),
+            border_focused: Color::Rgb(136, 192, 208),
+        }
+    }
+    pub fn by_index(i: usize) -> Self {
+        match i {
+            1 => Theme::default(),
+            2 => Theme::gruvbox(),
+            3 => Theme::catpuccin_mocha(),
+            4 => Theme::nord(),
+            _ => Theme::default(),
+        }
+    }
 }
