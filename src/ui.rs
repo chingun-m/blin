@@ -308,7 +308,7 @@ pub fn render_statusbar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
                     } else {
                         "  [H: hidden off]"
                     };
-                    let keyhints = "  j/k: move  g/G: top/bot backspace: go-back tab: sidebar  ctrl+p: pin  o: open with d: delete ctrl+b: paste q: quit";
+                    let keyhints = "  j/k: move  g/G: top/bot  ctrl+p: pin  o: open with d: delete ctrl+b: paste x: unpin q: quit";
                     Line::from(vec![Span::styled(
                         format!("{}{}", hidden_hint, keyhints),
                         Style::default().fg(t.status_fg),

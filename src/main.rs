@@ -298,6 +298,33 @@ impl App {
         }
     }
 
+    fn unpin_selected_sidebar(&mut self) {
+        let sel = match self.sidebar_state.selected() {
+            Some(s) => s,
+            None => return,
+        };
+
+        // layout: index 0 is the "Pinned" header, then the pinned folders
+        let pinned_start = 1;
+        let pinned_end = pinned_start + self.config.pinned.len();
+
+        // only works if the cursor is on a pinned folder (not a header or a drive)
+        if sel >= pinned_start && sel < pinned_end {
+            let removed = self.config.pinned.remove(sel - pinned_start);
+            self.config.save();
+
+            // the list got shorter, so keep the cursor in bounds
+            let new_len = self.sidebar_items().len();
+            self.sidebar_state.select(Some(sel.min(new_len.saturating_sub(1))));
+
+            let name = PathBuf::from(&removed)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or(removed);
+            self.message = Some(format!("unpinned '{}'", name));
+        }
+    }
+
     fn commit_jump(&mut self) {
         if let Ok(n) = self.jump_buf.parse::<usize>() {
             if n > 0 && n <= self.entries.len() {

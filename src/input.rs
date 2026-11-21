@@ -134,6 +134,7 @@ pub fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers
                     "openwith" | "ow" if !arg.is_empty() => {
                         app.open_with(arg);
                     }
+
                     _ => {}
                 }
                 app.mode = Mode::Normal;
@@ -251,6 +252,9 @@ pub fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers
 pub fn handle_sidebar_key(app: &mut App, code: KeyCode) {
     let items_len = app.sidebar_items().len();
     match code {
+        KeyCode::Char('x') => {
+            app.unpin_selected_sidebar();
+        }
         KeyCode::Char('j') | KeyCode::Down => {
             let next = app
                 .sidebar_state
