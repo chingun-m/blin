@@ -146,8 +146,48 @@ pub fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers
         }
         return;
     }
+    if let Mode::Search(ref mut input) = app.mode {
+        match code {
+            KeyCode::Char(c) => {
+                input.push(c);
+                app.filter = input.clone();
+                app.selected_items.clear();
+                app.reload();
+                app.list_state.select(if app.entries.is_empty() {
+                    None
+                } else {
+                    Some(0)
+                });
+            }
+            KeyCode::Backspace => {
+                input.pop();
+                app.filter = input.clone();
+                app.selected_items.clear();
+                app.reload();
+                app.list_state.select(if app.entries.is_empty() {
+                    None
+                } else {
+                    Some(0)
+                });
+            }
+            KeyCode::Enter => {
+                app.mode = Mode::Normal;
+            } // keep the filter, go back to navigating
+            KeyCode::Esc => {
+                app.filter.clear();
+                app.mode = Mode::Normal;
+                app.selected_items.clear();
+                app.reload();
+            }
+            _ => {}
+        }
+        return;
+    }
 
     match code {
+        KeyCode::Char('/') => {
+            app.mode = Mode::Search(app.filter.clone());
+        }
         KeyCode::Char('C') => {
             app.mode = Mode::Command(String::new());
         }
@@ -243,6 +283,10 @@ pub fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers
         KeyCode::Esc => {
             app.clear_selection();
             app.jump_buf.clear();
+            if !app.filter.is_empty() {
+                app.filter.clear();
+                app.reload();
+            }
         }
 
         _ => {}

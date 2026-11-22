@@ -164,7 +164,7 @@ pub struct App {
     clipboard: Vec<PathBuf>,
     clipboard_action: Option<ClipboardAction>,
     message: Option<String>,
-    theme_index: usize,
+    filter: String,
 }
 
 impl App {
@@ -193,28 +193,31 @@ impl App {
             drives,
             jump_buf: String::new(),
             show_hidden,
-            theme_index: 0,
             theme: theme::Theme::by_index(1),
             mode: Mode::Normal,
             selected_items: Vec::new(),
             clipboard: Vec::new(),
             clipboard_action: None,
             message: None,
+            filter: String::new(),
         })
     }
 
     fn reload(&mut self) {
         self.entries = load_entries(&self.current_dir, self.show_hidden);
         //keeping selection in bounds
+        if !self.filter.is_empty() {
+            let needle = self.filter.to_lowercase();
+            self.entries
+                .retain(|e| e.name.to_lowercase().contains(&needle));
+        }
+
         let sel = self.list_state.selected().unwrap_or(0);
         if self.entries.is_empty() {
             self.list_state.select(None);
         } else {
-            self.list_state.select(if self.entries.is_empty() {
-                None
-            } else {
-                Some(0)
-            });
+            self.list_state
+                .select(Some(sel.min(self.entries.len() - 1)));
         }
     }
 
@@ -315,7 +318,8 @@ impl App {
 
             // the list got shorter, so keep the cursor in bounds
             let new_len = self.sidebar_items().len();
-            self.sidebar_state.select(Some(sel.min(new_len.saturating_sub(1))));
+            self.sidebar_state
+                .select(Some(sel.min(new_len.saturating_sub(1))));
 
             let name = PathBuf::from(&removed)
                 .file_name()
@@ -616,6 +620,7 @@ pub enum Mode {
     NewFile(String),
     NewFolder(String),
     Command(String),
+    Search(String),
 }
 
 fn main() -> io::Result<()> {

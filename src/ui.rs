@@ -289,6 +289,11 @@ pub fn render_statusbar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
                 Span::styled(input.clone(), Style::default().fg(Color::White)),
                 Span::styled("", Style::default().fg(Color::White)),
             ]),
+            Mode::Search(input) => Line::from(vec![
+                Span::styled(" search: ", Style::default().fg(t.preview_label)),
+                Span::styled(input.clone(), Style::default().fg(Color::White)),
+                Span::styled("█", Style::default().fg(Color::White)),
+            ]),
             Mode::ConfirmDelete => {
                 let count = app.get_targets().len();
                 Line::from(Span::styled(
