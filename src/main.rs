@@ -203,6 +203,90 @@ impl App {
         })
     }
 
+    fn compress_selected(&mut self) {
+        let targets = self.get_targets();
+        if targets.is_empty() {
+            return;
+        }
+
+        // one item: name it after the item. multiple: archive.zip
+        let base = if targets.len() == 1 {
+            let stem = targets[0]
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "archive".to_string());
+            format!("{}.zip", stem)
+        } else {
+            "archive.zip".to_string()
+        };
+
+        let dest = file_ops::unique_dest(&self.current_dir, std::ffi::OsStr::new(&base));
+
+        match file_ops::create_zip(&targets, &dest) {
+            Ok(_) => {
+                let name = dest
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                self.message = Some(format!("created '{}'", name));
+            }
+            Err(e) => {
+                // don't leave a broken half-written zip behind
+                let _ = fs::remove_file(&dest);
+                self.message = Some(format!("zip failed: {}", e));
+            }
+        }
+
+        self.selected_items.clear();
+        self.reload();
+    }
+
+    fn extract_selected(&mut self) {
+        let entry = match self.selected_entry() {
+            Some(e) => e,
+            None => return,
+        };
+
+        let is_zip = entry
+            .path
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase() == "zip")
+            .unwrap_or(false);
+
+        if entry.is_dir || !is_zip {
+            self.message = Some("not a .zip file".to_string());
+            return;
+        }
+
+        let zip_path = entry.path.clone();
+
+        // folder named after the zip, e.g. photos.zip -> photos/
+        let stem = zip_path
+            .file_stem()
+            .map(|s| s.to_os_string())
+            .unwrap_or_else(|| std::ffi::OsString::from("extracted"));
+        let dest = file_ops::unique_dest(&self.current_dir, &stem);
+
+        match file_ops::extract_zip(&zip_path, &dest) {
+            Ok(_) => {
+                let name = dest
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                self.message = Some(format!("extracted to '{}/'", name));
+            }
+            Err(e) => {
+                // clean up the half-extracted folder
+                let _ = fs::remove_dir_all(&dest);
+                self.message = Some(format!("unzip failed: {}", e));
+            }
+        }
+
+        self.reload();
+    }
+
     fn reload(&mut self) {
         self.entries = load_entries(&self.current_dir, self.show_hidden);
         //keeping selection in bounds

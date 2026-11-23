@@ -39,3 +39,70 @@ pub fn copy_dir_recursive(src: &PathBuf, dest: &PathBuf) -> io::Result<()> {
     }
     Ok(())
 }
+
+pub fn add_to_zip<W: io::Write + io::Seek>(
+    zip: &mut zip::ZipWriter<W>,
+    path: &PathBuf,
+    name_in_zip: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let options = zip::write::SimpleFileOptions::default();
+
+    if path.is_dir() {
+        zip.add_directory(format!("{}/", name_in_zip), options)?;
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
+            let child = format!("{}/{}", name_in_zip, entry.file_name().to_string_lossy());
+            add_to_zip(zip, &entry.path(), &child)?;
+        }
+    } else {
+        zip.start_file(name_in_zip, options)?;
+        let mut f = fs::File::open(path)?;
+        io::copy(&mut f, zip)?;
+    }
+    Ok(())
+}
+
+pub fn create_zip(targets: &[PathBuf], dest: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let file = fs::File::create(dest)?;
+    let mut zip = zip::ZipWriter::new(file);
+
+    for path in targets {
+        let name = match path.file_name() {
+            Some(n) => n.to_string_lossy().to_string(),
+            None => continue,
+        };
+        add_to_zip(&mut zip, path, &name)?;
+    }
+
+    zip.finish()?;
+    Ok(())
+}
+
+pub fn extract_zip(zip_path: &PathBuf, dest: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let file = fs::File::open(zip_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+
+    fs::create_dir_all(dest)?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i)?;
+
+        // enclosed_name rejects malicious paths like "../../evil.exe"
+        let relative = match entry.enclosed_name() {
+            Some(p) => p,
+            None => continue,
+        };
+        let out_path = dest.join(relative);
+
+        if entry.is_dir() {
+            fs::create_dir_all(&out_path)?;
+        } else {
+            if let Some(parent) = out_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let mut out_file = fs::File::create(&out_path)?;
+            io::copy(&mut entry, &mut out_file)?;
+        }
+    }
+    Ok(())
+}

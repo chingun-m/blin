@@ -134,6 +134,12 @@ pub fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers
                     "openwith" | "ow" if !arg.is_empty() => {
                         app.open_with(arg);
                     }
+                    "z" | "zip" => {
+                        app.compress_selected();
+                    }
+                    "uz" | "unzip" => {
+                        app.extract_selected();
+                    }
 
                     _ => {}
                 }
