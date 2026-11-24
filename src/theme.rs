@@ -151,12 +151,43 @@ impl Theme {
             border_focused: Color::Rgb(136, 192, 208),
         }
     }
+    pub fn neon1() -> Self {
+        Self {
+            bg: Color::Black,
+            fg: Color::Rgb(140, 0, 255),
+
+            topbar_bg: Color::Rgb(69, 6, 147),
+            topbar_fg: Color::Rgb(255, 196, 0),
+
+            sidebar_bg: Color::Black,
+            sidebar_fg: Color::Rgb(140, 0, 255),
+            sidebar_sel_bg: Color::Rgb(67, 76, 94),
+            sidebar_sel_fg: Color::Rgb(236, 239, 244),
+
+            dir_fg: Color::Rgb(140, 0, 255),
+            file_fg: Color::Rgb(216, 222, 233),
+            broken_fg: Color::Rgb(191, 97, 106),
+
+            selected_bg: Color::Rgb(255, 196, 0),
+            selected_fg: Color::Rgb(69, 6, 147),
+
+            preview_label: Color::Rgb(255, 196, 0),
+            preview_value: Color::Rgb(140, 0, 255),
+
+            status_bg: Color::Rgb(69, 6, 147),
+            status_fg: Color::Rgb(255, 63, 127),
+
+            border: Color::Rgb(255, 196, 0),
+            border_focused: Color::Rgb(255, 63, 127),
+        }
+    }
     pub fn by_index(i: usize) -> Self {
         match i {
             1 => Theme::default(),
             2 => Theme::gruvbox(),
             3 => Theme::catpuccin_mocha(),
             4 => Theme::nord(),
+            5 => Theme::neon1(),
             _ => Theme::default(),
         }
     }

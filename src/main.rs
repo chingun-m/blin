@@ -633,6 +633,48 @@ impl App {
         self.mode = Mode::Normal;
         self.reload();
     }
+
+    fn rename_item(&mut self, new_name: &str) {
+        let new_name = new_name.trim();
+        if new_name.is_empty() {
+            self.mode = Mode::Normal;
+            return;
+        }
+
+        let old_path = match self.selected_entry() {
+            Some(e) => e.path.clone(),
+            None => {
+                self.mode = Mode::Normal;
+                return;
+            }
+        };
+
+        let new_path = self.current_dir.join(new_name);
+
+        if new_path == old_path {
+            self.mode = Mode::Normal;
+            return;
+        }
+
+        let old_name = old_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let case_only_change = cfg!(windows) && old_name.to_lowercase() == new_name.to_lowercase();
+        if new_path.exists() && !case_only_change {
+            self.message = Some(format!("'{}' already exists", new_name));
+            self.mode = Mode::Normal;
+            return;
+        }
+
+        match fs::rename(&old_path, &new_path) {
+            Ok(_) => self.message = Some(format!("renamed to '{}'", new_name)),
+            Err(e) => self.message = Some(format!("rename failed: {}", e)),
+        }
+
+        self.mode = Mode::Normal;
+        self.reload();
+    }
 }
 
 fn get_drives() -> Vec<PathBuf> {

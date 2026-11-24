@@ -140,6 +140,9 @@ pub fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers
                     "uz" | "unzip" => {
                         app.extract_selected();
                     }
+                    "rn" | "rename" if !arg.is_empty() => {
+                        app.rename_item(arg);
+                    }
 
                     _ => {}
                 }
