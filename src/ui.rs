@@ -274,6 +274,11 @@ pub fn render_statusbar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         ))
     } else {
         match &app.mode {
+            Mode::RunWith(input) => Line::from(vec![
+                Span::styled(" run in window: ", Style::default().fg(t.preview_label)),
+                Span::styled(input.clone(), Style::default().fg(Color::White)),
+                Span::styled("█", Style::default().fg(Color::White)),
+            ]),
             Mode::OpenWith(input) => Line::from(vec![
                 Span::styled(" open with: ", Style::default().fg(t.preview_label)),
                 Span::styled(input.clone(), Style::default().fg(Color::White)),

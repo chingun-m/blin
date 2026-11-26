@@ -1,6 +1,6 @@
-use std::io::{self, Write};
+use std::fs;
+use std::io::{self};
 use std::path::PathBuf;
-use std::{default, fs, string};
 
 pub fn unique_dest(dest_dir: &PathBuf, name: &std::ffi::OsStr) -> PathBuf {
     let mut dest = dest_dir.join(name);

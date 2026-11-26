@@ -1,6 +1,6 @@
 use crate::theme;
 use crate::{App, Focus, Mode};
-use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::event::{KeyCode, KeyModifiers};
 
 pub fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
     if let Mode::NewFile(ref mut input) = app.mode {
@@ -79,6 +79,25 @@ pub fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers
         return;
     }
 
+    if let Mode::RunWith(ref mut input) = app.mode {
+        match code {
+            KeyCode::Char(c) => {
+                input.push(c);
+            }
+            KeyCode::Backspace => {
+                input.pop();
+            }
+            KeyCode::Enter => {
+                app.execute_run_with();
+            }
+            KeyCode::Esc => {
+                app.mode = Mode::Normal;
+            }
+            _ => {}
+        }
+        return;
+    }
+
     if let Mode::ChangeTheme(ref mut input) = app.mode {
         match code {
             KeyCode::Char(c) if c.is_ascii_digit() => {
@@ -142,6 +161,9 @@ pub fn handle_filelist_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers
                     }
                     "rn" | "rename" if !arg.is_empty() => {
                         app.rename_item(arg);
+                    }
+                    "r" | "run" if !arg.is_empty() => {
+                        app.run_with(arg);
                     }
 
                     _ => {}

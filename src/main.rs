@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode};
 use crossterm::style::SetStyle;
 use crossterm::terminal;
 use human_bytes::human_bytes;
@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
-use std::time::UNIX_EPOCH;
 use std::{default, fs, string};
 
 mod file_ops;
@@ -588,6 +587,36 @@ impl App {
             }
         }
     }
+    fn run_with(&mut self, command_line: &str) {
+        let parts: Vec<&str> = command_line.trim().split_whitespace().collect();
+        if parts.is_empty() {
+            return;
+        }
+
+        if let Some(entry) = self.selected_entry() {
+            #[cfg(windows)]
+            {
+                const CREATE_NEW_CONSOLE: u32 = 0x00000010;
+
+                let _ = std::process::Command::new("cmd")
+                    .arg("/K")
+                    .args(&parts)
+                    .arg(&entry.path)
+                    .creation_flags(CREATE_NEW_CONSOLE)
+                    .spawn();
+            }
+            #[cfg(not(windows))]
+            {
+                let _ = std::process::Command::new(parts[0])
+                    .args(&parts[1..])
+                    .arg(&entry.path)
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn();
+            }
+        }
+    }
 
     fn change_theme(&mut self) {
         if let Mode::ChangeTheme(input) = self.mode.clone() {
@@ -600,6 +629,13 @@ impl App {
     fn execute_open_with(&mut self) {
         if let Mode::OpenWith(input) = self.mode.clone() {
             self.open_with(&input);
+        }
+        self.mode = Mode::Normal;
+    }
+
+    fn execute_run_with(&mut self) {
+        if let Mode::RunWith(input) = self.mode.clone() {
+            self.run_with(&input);
         }
         self.mode = Mode::Normal;
     }
@@ -747,6 +783,7 @@ pub enum Mode {
     NewFolder(String),
     Command(String),
     Search(String),
+    RunWith(String),
 }
 
 fn main() -> io::Result<()> {
