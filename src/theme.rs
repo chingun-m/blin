@@ -6,6 +6,9 @@ pub struct Theme {
     pub bg: Color,
     pub fg: Color,
 
+    //Icon
+    pub pin_icon: Color,
+
     // Topbar
     pub topbar_bg: Color,
     pub topbar_fg: Color,
@@ -41,6 +44,7 @@ impl Theme {
         Self {
             bg: Color::Reset,
             fg: Color::White,
+            pin_icon: Color::LightRed,
             topbar_bg: Color::Rgb(30, 30, 40),
             topbar_fg: Color::Rgb(150, 180, 255),
             sidebar_bg: Color::Rgb(20, 20, 28),
@@ -64,6 +68,7 @@ impl Theme {
         Self {
             bg: Color::Reset,
             fg: Color::Rgb(235, 219, 178),
+            pin_icon: Color::LightRed,
             topbar_bg: Color::Rgb(40, 40, 40),
             topbar_fg: Color::Rgb(250, 189, 47),
             sidebar_bg: Color::Rgb(40, 40, 40),
@@ -88,6 +93,9 @@ impl Theme {
             // Base
             bg: Color::Rgb(30, 30, 46),    // Base
             fg: Color::Rgb(205, 214, 244), // Text
+
+            //Icon
+            pin_icon: Color::LightRed,
 
             // Topbar
             topbar_bg: Color::Rgb(24, 24, 37),    // Mantle
@@ -126,6 +134,8 @@ impl Theme {
             bg: Color::Rgb(46, 52, 64),
             fg: Color::Rgb(216, 222, 233),
 
+            pin_icon: Color::LightRed,
+
             topbar_bg: Color::Rgb(59, 66, 82),
             topbar_fg: Color::Rgb(136, 192, 208),
 
@@ -155,6 +165,8 @@ impl Theme {
         Self {
             bg: Color::Black,
             fg: Color::Rgb(140, 0, 255),
+
+            pin_icon: Color::LightRed,
 
             topbar_bg: Color::Rgb(69, 6, 147),
             topbar_fg: Color::Rgb(255, 196, 0),

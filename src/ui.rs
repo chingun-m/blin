@@ -1,4 +1,4 @@
-use crate::{App, Focus, Mode};
+use crate::{App, Focus, Mode, icons};
 use human_bytes::human_bytes;
 use ratatui::{
     Frame,
@@ -122,9 +122,10 @@ pub fn render_file_list(f: &mut Frame, app: &mut App, area: ratatui::layout::Rec
             };
 
             if entry.is_broken {
+                let (glyph, color) = icons::icon_for(entry);
                 let line = Line::from(vec![
                     Span::styled(num, num_style),
-                    Span::styled("!!! ", Style::default().fg(t.broken_fg)),
+                    Span::styled(format!("{glyph} "), Style::default().fg(color)),
                     Span::styled(display_name, Style::default().fg(t.broken_fg)),
                     Span::styled("  [BROKEN]", Style::default().fg(Color::DarkGray)),
                 ]);
@@ -132,9 +133,10 @@ pub fn render_file_list(f: &mut Frame, app: &mut App, area: ratatui::layout::Rec
             }
 
             if entry.is_dir {
+                let (glyph, color) = icons::icon_for(entry);
                 let line = Line::from(vec![
                     Span::styled(num, num_style),
-                    Span::styled("📁 ", Style::default()),
+                    Span::styled(format!("{glyph} "), Style::default().fg(t.dir_fg)),
                     Span::styled(
                         format!("{}/", display_name),
                         Style::default().fg(t.dir_fg).add_modifier(Modifier::BOLD),
@@ -147,9 +149,10 @@ pub fn render_file_list(f: &mut Frame, app: &mut App, area: ratatui::layout::Rec
                     .map(|s| human_bytes(s as f64).replace("666", "between 665 and 667"))
                     .unwrap_or_else(|| "—".to_string());
 
+                let (glyph, color) = icons::icon_for(entry);
                 let line = Line::from(vec![
                     Span::styled(num, num_style),
-                    Span::styled("📄 ", Style::default()),
+                    Span::styled(format!("{glyph} "), Style::default().fg(color)),
                     Span::styled(display_name, Style::default().fg(t.file_fg)),
                     Span::styled(
                         format!("  {}", size_str),

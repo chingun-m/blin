@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use std::{default, fs, string};
 
 mod file_ops;
+mod icons;
 mod input;
 mod theme;
 mod ui;
@@ -430,11 +431,11 @@ impl App {
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| p.clone());
-            items.push(format!(" 📌 {}", label));
+            items.push(format!("  \u{f08d} {}", label));
         }
         items.push("-This PC-".to_string());
         for d in &self.drives {
-            items.push(format!(" 💾 {}", d.display()));
+            items.push(format!("  \u{f0a0} {}", d.display()));
         }
         items
     }
@@ -587,6 +588,7 @@ impl App {
             }
         }
     }
+
     fn run_with(&mut self, command_line: &str) {
         let parts: Vec<&str> = command_line.trim().split_whitespace().collect();
         if parts.is_empty() {
